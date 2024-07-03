@@ -1,0 +1,3 @@
+[submodule "client/Estate-UI"]
+	path = client/Estate-UI
+	url = https://github.com/sakshamj106/Estate-UI.git
