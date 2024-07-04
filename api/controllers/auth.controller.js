@@ -56,7 +56,7 @@ export const login = async (req,res) => {
     const token = jwt.sign(
       {
         id: user.id,
-        isAdmin: false,
+        isAdmin: true,
       },
       process.env.JWT_SECRET_KEY,
       { expiresIn: age }
@@ -69,7 +69,7 @@ export const login = async (req,res) => {
         httpOnly: true,
         // secure:true,
         maxAge: age,
-      }).status(200).json({message:"login succesful"});
+      }).status(200).json(userInfo);
   } catch (err) {
     console.log(err);
     res.status(500).json({ message: "Failed to login!" });
