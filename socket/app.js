@@ -1,20 +1,16 @@
+import express from "express";
+import http from "http";
 import { Server } from "socket.io";
 import cors from "cors";
-import express from "express";
 
 const app = express();
+const server = http.createServer(app);
 
-// Use CORS middleware
-app.use(cors({
-  origin: "http://localhost:5173", // URL of your frontend
-  methods: ["GET", "POST"],         // Allowed methods
-  credentials: true                 // Allow cookies and other credentials
-}));
+app.use(cors());
 
-const io = new Server(app, {
+const io = new Server(server, {
   cors: {
-    origin: "http://localhost:5173", // URL of your frontend
-    methods: ["GET", "POST"],
+    origin: "http://localhost:5173",
   },
 });
 
@@ -36,25 +32,25 @@ const getUser = (userId) => {
 };
 
 io.on("connection", (socket) => {
-  console.log("A user connected");
-
   socket.on("newUser", (userId) => {
     addUser(userId, socket.id);
-    console.log(`User ${userId} added with socket ID ${socket.id}`);
+    console.log("Online users:", onlineUser); // Debugging
   });
 
   socket.on("sendMessage", ({ receiverId, data }) => {
     const receiver = getUser(receiverId);
     if (receiver) {
       io.to(receiver.socketId).emit("getMessage", data);
-      console.log(`Message sent to ${receiverId}`);
+    } else {
+      console.error(`Receiver not found: ${receiverId}`); // Debugging
     }
   });
 
   socket.on("disconnect", () => {
     removeUser(socket.id);
-    console.log("User disconnected");
+    console.log("User disconnected", socket.id); // Debugging
+    console.log("Online users after disconnect:", onlineUser); // Debugging
   });
 });
 
-io.listen(4000);
+io.listen("4000");
