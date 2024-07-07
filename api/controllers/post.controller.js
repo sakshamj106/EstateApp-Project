@@ -1,111 +1,128 @@
 import prisma from "../lib/prisma.js";
 import jwt from "jsonwebtoken";
 
-export const getPosts = async (req,res) => {
+export const getPosts = async (req, res) => {
   const query = req.query;
 
-    try {
-        const posts = await prisma.post.findMany({
-          where: {
-            city: query.city || undefined,
-            type: query.type || undefined,
-            property: query.property || undefined,
-            bedroom: parseInt(query.bedroom) || undefined,
-            price: {
-              gte: parseInt(query.minPrice) || undefined,
-              lte: parseInt(query.maxPrice) || undefined,
-            },
-          },
-        });
+  try {
+    const posts = await prisma.post.findMany({
+      where: {
+        city: query.city || undefined,
+        type: query.type || undefined,
+        property: query.property || undefined,
+        bedroom: parseInt(query.bedroom) || undefined,
+        price: {
+          gte: parseInt(query.minPrice) || undefined,
+          lte: parseInt(query.maxPrice) || undefined,
+        },
+      },
+    });
 
-       // setTimeout(() => {
+    res.status(200).json(posts);
+  } catch (err) {
+    console.error('Error fetching posts:', err);
+    res.status(500).json({ message: "Failed to get posts" });
+  }
+};
 
-          res.status(200).json(posts);
-        //},3000);
-        
-    } catch (err) {
-        console.log(err);
-        res.status(500).json({message : "Failed to get posts"});
-    }
-}
-export const getPost = async (req,res) => {
-    const id = req.params.id;
-    try {
+export const getPost = async (req, res) => {
+  const id = req.params.id;
+  let userId = null;
 
-        const post = await prisma.post.findUnique({
-            where:{id},
-            include: {
-                postDetail: true,
-                user: {
-                  select: {
-                    username: true,
-                    avatar: true,
-                  },
-                },
-              },
-        });
-         let userId;
-        const token = req.cookies?.token;
-        if(!token){
-          userId = null
-        }
-        else {
-          jwt.verify(token, process.env.JWT_SECRET_KEY, async (err, payload) => {
-            if(err){
-              userId =null
-            }
-           else{
-              userId = payload.id;   
-              
-            }
+  try {
+    console.log('Fetching post with ID:', id);
 
-          });
-        }
-        const saved = await prisma.savedPost.findUnique({
-          where: {
-            userId_postId: {
-              postId: id,
-              userId,
-            },
-          },
-        });
-        // res.status(200).json({ ...post, isSaved: false });
-        res.status(200).json({ ...post, isSaved: saved ? true : false });
-    } catch (err) {
-        console.log(err);
-        res.status(500).json({message : "Failed to get post"});
-    }
-}
-export const addPost = async (req,res) => {
-    const body = req.body;
-    const tokenUserId = req.userId;
-  
-    try {
-      const newPost = await prisma.post.create({
-        data: {
-          ...body.postData,
-          userId: tokenUserId,
-          postDetail: {
-            create: body.postDetail,
+    // Fetch the post
+    const post = await prisma.post.findUnique({
+      where: { id },
+      include: {
+        postDetail: true,
+        user: {
+          select: {
+            username: true,
+            avatar: true,
           },
         },
-      });
-      res.status(200).json(newPost);
-    } catch (err) {
-        console.log(err);
-        res.status(500).json({message : "Failed to add post"});
+      },
+    });
+
+    if (!post) {
+      return res.status(404).json({ message: "Post not found" });
     }
-}
-export const updatePost = async (req,res) => {
-    try {
-        res.status(200).json();
-    } catch (err) {
-        console.log(err);
-        res.status(500).json({message : "Failed to update post"});
+
+    console.log('Post fetched:', post);
+
+    // Retrieve userId from token if available
+    const token = req.cookies?.token;
+    if (token) {
+      try {
+        const payload = await new Promise((resolve, reject) => {
+          jwt.verify(token, process.env.JWT_SECRET_KEY, (err, decoded) => {
+            if (err) return reject(err);
+            resolve(decoded);
+          });
+        });
+        userId = payload.id;
+      } catch (err) {
+        console.error('Token verification error:', err.message);
+        userId = null;
+      }
     }
-}
-export const deletePost = async (req,res) => {
-    const id = req.params.id;
+
+    console.log('User ID from token:', userId);
+
+    // Check if the post is saved by the user
+    const saved = userId ? await prisma.savedPost.findUnique({
+      where: {
+        userId_postId: {
+          postId: id,
+          userId,
+        },
+      },
+    }) : null;
+
+    res.status(200).json({ ...post, isSaved: saved ? true : false });
+  } catch (err) {
+    console.error('Error fetching post:', err.message);
+    console.error('Stack trace:', err.stack);
+    res.status(500).json({ message: "Failed to get post" });
+  }
+};
+
+
+export const addPost = async (req, res) => {
+  const body = req.body;
+  const tokenUserId = req.userId;
+
+  try {
+    const newPost = await prisma.post.create({
+      data: {
+        ...body.postData,
+        userId: tokenUserId,
+        postDetail: {
+          create: body.postDetail,
+        },
+      },
+    });
+    res.status(200).json(newPost);
+  } catch (err) {
+    console.error('Error adding post:', err);
+    res.status(500).json({ message: "Failed to add post" });
+  }
+};
+
+export const updatePost = async (req, res) => {
+  try {
+    // Implement your update logic here
+    res.status(200).json({ message: 'Post updated successfully' });
+  } catch (err) {
+    console.error('Error updating post:', err);
+    res.status(500).json({ message: "Failed to update post" });
+  }
+};
+
+export const deletePost = async (req, res) => {
+  const id = req.params.id;
   const tokenUserId = req.userId;
 
   try {
@@ -122,8 +139,8 @@ export const deletePost = async (req,res) => {
     });
 
     res.status(200).json({ message: "Post deleted" });
-  }  catch (err) {
-        console.log(err);
-        res.status(500).json({message : "Failed to delete post"});
-    }
-}
+  } catch (err) {
+    console.error('Error deleting post:', err);
+    res.status(500).json({ message: "Failed to delete post" });
+  }
+};
